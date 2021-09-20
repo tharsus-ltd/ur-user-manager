@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  user_manager:
+    build: .
+    ports:
+      - "80:80"
+    depends_on:
+      - "user_man_db"
+      - "rabbitmq"
+    environment:
+      - MAX_WORKERS=1
+      - REDIS_SERVICE=user_man_db
+      - SERVICE_NAME=User Manager
+      - ROOT_PATH=/
+      - SECRET_KEY=e9629f658c37859ab9d74680a3480b99265c7d4c89224280cb44a255c320661f
+
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    container_name: "rabbitmq"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  user_man_db:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"

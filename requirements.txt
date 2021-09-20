@@ -1,0 +1,13 @@
+fastapi[All]
+pytest
+hypothesis
+pytest-asyncio
+pytest-mock
+python-jose[cryptography]
+passlib[bcrypt]
+aio_pika
+pydantic
+aioredis
+fakeredis
+black
+mypy
