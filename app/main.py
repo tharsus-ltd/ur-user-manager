@@ -33,7 +33,7 @@ async def status():
 
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
+    user = await authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -49,7 +49,8 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 @app.post("/register", response_model=User)
 async def register_new_user(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = set_user(form_data.username, form_data.password)
+    user = await set_user(form_data.username, form_data.password)
+    return user
     
 
 @app.get("/users/me/", response_model=User)

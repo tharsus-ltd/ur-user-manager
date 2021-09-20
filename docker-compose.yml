@@ -3,6 +3,7 @@ version: "3.9"
 services:
   user_manager:
     build: .
+    container_name: user_manager
     ports:
       - "80:80"
     depends_on:
@@ -23,6 +24,7 @@ services:
       - "15672:15672"
 
   user_man_db:
+    container_name: "user_man_db"
     image: "redis:alpine"
     ports:
       - "6379:6379"

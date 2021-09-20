@@ -42,7 +42,8 @@ async def set_user(username: str, password: str) -> User:
 
 async def get_user(username: str) -> UserInDB:
     if Handlers().redis.exists(get_key(username)):
-        user_dict = json.loads(Handlers().redis.get(get_key(username)))
+        raw = await Handlers().redis.get(get_key(username))
+        user_dict = json.loads(raw)
         return UserInDB(**user_dict)
 
 
