@@ -1,3 +1,5 @@
+import asyncio
+
 from datetime import timedelta
 
 from fastapi import FastAPI, status
@@ -9,7 +11,7 @@ from app import __root__, __service__, __version__
 from app.handlers import Handlers
 from app.models import Token, User
 from app.security import (ACCESS_TOKEN_EXPIRE_MINUTES, authenticate_user,
-                          create_access_token, get_active_user, get_current_active_user,
+                          create_access_token, get_current_active_user,
                           set_user)
 
 app = FastAPI(title=__service__, root_path=__root__, version=__version__)
@@ -17,6 +19,8 @@ app = FastAPI(title=__service__, root_path=__root__, version=__version__)
 
 @app.on_event("startup")
 async def startup():
+    # Wait for RabbitMQ and Redis
+    await asyncio.sleep(20)
     await Handlers().init()
 
 
@@ -56,11 +60,6 @@ async def register_new_user(form_data: OAuth2PasswordRequestForm = Depends()):
     return user
 
 
-@app.get("/user", response_model=User)
-async def read_user(user: User = Depends(get_active_user)):
-    return user
-
-
-@app.get("/users/me/", response_model=User)
+@app.get("/users/me", response_model=User)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user

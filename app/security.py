@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from typing import Optional
 from datetime import timedelta, datetime
@@ -8,7 +9,7 @@ from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 
-from app import __secret_key__
+from app import __secret_key__, __service__
 from app.handlers import Handlers
 from app.models import UserInDB, TokenData, User
 
@@ -63,7 +64,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
+    to_encode.update({
+        "iss": __service__.replace(" ", "-").lower(),
+        "exp": expire,
+        "iat": datetime.utcnow(),
+        "aud": ["all"],
+        "jti": str(uuid.uuid4())
+    })
     encoded_jwt = jwt.encode(to_encode, __secret_key__, algorithm=ALGORITHM)
     return encoded_jwt
 
