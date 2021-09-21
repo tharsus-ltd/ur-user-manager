@@ -9,7 +9,7 @@ from app import __root__, __service__, __version__
 from app.handlers import Handlers
 from app.models import Token, User
 from app.security import (ACCESS_TOKEN_EXPIRE_MINUTES, authenticate_user,
-                          create_access_token, get_current_active_user,
+                          create_access_token, get_active_user, get_current_active_user,
                           set_user)
 
 app = FastAPI(title=__service__, root_path=__root__, version=__version__)
@@ -35,11 +35,12 @@ async def get_status():
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends()
 ):
-    user = await authenticate_user(form_data.username, form_data.password)
-    if not user:
+    try:
+        user = await authenticate_user(form_data.username, form_data.password)
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail=f"Incorrect username or password: {e}",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -53,7 +54,12 @@ async def login_for_access_token(
 async def register_new_user(form_data: OAuth2PasswordRequestForm = Depends()):
     user = await set_user(form_data.username, form_data.password)
     return user
-    
+
+
+@app.get("/user", response_model=User)
+async def read_user(user: User = Depends(get_active_user)):
+    return user
+
 
 @app.get("/users/me/", response_model=User)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):

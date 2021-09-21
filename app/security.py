@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import timedelta, datetime
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 
@@ -27,7 +27,7 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_key(username: str) -> str:
+def get_key(username: Optional[str]) -> str:
     return f"user:{username}"
 
 
@@ -40,19 +40,20 @@ async def set_user(username: str, password: str) -> User:
     return new_user
 
 
-async def get_user(username: str) -> UserInDB:
+async def get_user(username: Optional[str]) -> UserInDB:
     if Handlers().redis.exists(get_key(username)):
         raw = await Handlers().redis.get(get_key(username))
         user_dict = json.loads(raw)
         return UserInDB(**user_dict)
+    raise ValueError(f"Username: {username} not found")
 
 
 async def authenticate_user(username: str, password: str) -> UserInDB:
     user = await get_user(username)
     if not user:
-        return False
+        raise ValueError(f"Error getting user: {username}")
     if not verify_password(password, user.hashed_password):
-        return False
+        raise ValueError(f"Error verifying password for username: {username}")
     return user
 
 
@@ -85,6 +86,32 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     if user is None:
         raise credentials_exception
     return User(**user.dict())
+
+
+async def get_user_from_token(token: str = Depends(oauth2_scheme)) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, __secret_key__, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    user = await get_user(username=token_data.username)
+    if user is None:
+        raise credentials_exception
+    return User(**user.dict())
+
+
+async def get_active_user(user: User = Depends(get_user_from_token)):
+    if user.disabled:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return user
 
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
