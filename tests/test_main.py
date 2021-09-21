@@ -1,27 +1,35 @@
-from app.handlers import Handlers
 import pytest
 
-from app.rockets import get_rocket
-from app.models import RocketCreate
-from app.main import create_rocket
+from app import __version__, __service__
+from app.main import root, get_status
 
 
 @pytest.mark.asyncio
-async def test_rocket_creation(handlers, mocker):
+async def test_root():
+    assert await root() == {'Service': __service__, 'Version': __version__}
 
-    with mocker.patch.object(Handlers, "send_msg"):
 
-        rocket = await create_rocket(
-            RocketCreate(
-                num_engines = 4,
-                height = 200
-            )
-        )
+@pytest.mark.asyncio
+async def test_status():
+    assert await get_status() is False
 
-        assert rocket.height == 200
-        assert rocket.num_engines == 4
-        assert rocket.fuel > 0
 
-        assert await get_rocket(rocket.id) == rocket
+# @pytest.mark.asyncio
+# async def test_root(handlers, mocker):
 
-        Handlers.send_msg.assert_called_once()
+#     with mocker.patch.object(Handlers, "send_msg"):
+
+#         rocket = await create_rocket(
+#             RocketCreate(
+#                 num_engines = 4,
+#                 height = 200
+#             )
+#         )
+
+#         assert rocket.height == 200
+#         assert rocket.num_engines == 4
+#         assert rocket.fuel > 0
+
+#         assert await get_rocket(rocket.id) == rocket
+
+#         Handlers.send_msg.assert_called_once()

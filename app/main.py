@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from fastapi.exceptions import HTTPException
 from fastapi.param_functions import Depends
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
@@ -26,13 +26,15 @@ async def root():
 
 
 @app.get("/status")
-async def status():
+async def get_status():
     # Add checks to ensure the system is running
     return False
 
 
 @app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends()
+):
     user = await authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(

@@ -10,4 +10,5 @@ pydantic
 aioredis
 fakeredis
 black
+flake8
 mypy
