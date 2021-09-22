@@ -42,7 +42,7 @@ async def set_user(username: str, password: str) -> User:
 
 
 async def get_user(username: Optional[str]) -> UserInDB:
-    if Handlers().redis.exists(get_key(username)):
+    if await Handlers().redis.exists(get_key(username)):
         raw = await Handlers().redis.get(get_key(username))
         user_dict = json.loads(raw)
         return UserInDB(**user_dict)
@@ -65,60 +65,52 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({
-        "iss": __service__.replace(" ", "-").lower(),
+        "iss": get_jwt_issuer(),
         "exp": expire,
         "iat": datetime.utcnow(),
-        "aud": ["all"],
+        "aud": ["micro-rocket"],
         "jti": str(uuid.uuid4())
     })
     encoded_jwt = jwt.encode(to_encode, __secret_key__, algorithm=ALGORITHM)
     return encoded_jwt
 
 
+def get_jwt_issuer() -> str:
+    return __service__.replace(" ", "-").lower()
+
+
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
     try:
-        payload = jwt.decode(token, __secret_key__, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token,
+            __secret_key__,
+            audience="micro-rocket",
+            issuer=get_jwt_issuer(),
+            algorithms=[ALGORITHM]
+        )
         username: str = payload.get("sub")
+        print(username)
         if username is None:
-            raise credentials_exception
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Username problematic in JWT",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         token_data = TokenData(username=username)
     except JWTError:
-        raise credentials_exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Error decoding JWT",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     user = await get_user(username=token_data.username)
     if user is None:
-        raise credentials_exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Username not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return User(**user.dict())
-
-
-async def get_user_from_token(token: str = Depends(oauth2_scheme)) -> User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, __secret_key__, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    user = await get_user(username=token_data.username)
-    if user is None:
-        raise credentials_exception
-    return User(**user.dict())
-
-
-async def get_active_user(user: User = Depends(get_user_from_token)):
-    if user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return user
 
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)):

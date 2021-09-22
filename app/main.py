@@ -6,6 +6,7 @@ from fastapi import FastAPI, status
 from fastapi.exceptions import HTTPException
 from fastapi.param_functions import Depends
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 
 from app import __root__, __service__, __version__
 from app.handlers import Handlers
@@ -16,6 +17,20 @@ from app.security import (ACCESS_TOKEN_EXPIRE_MINUTES, authenticate_user,
 
 app = FastAPI(title=__service__, root_path=__root__, version=__version__)
 
+origins = [
+    "http://localhost",
+    "http://localhost:8001",
+    "http://localhost:8002",
+    "http://localhost:5000"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 async def startup():
