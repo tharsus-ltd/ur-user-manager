@@ -79,6 +79,10 @@ def get_jwt_issuer() -> str:
     return __service__.replace(" ", "-").lower()
 
 
+async def user_exists(username: str) -> bool:
+    return await Handlers().redis.exists(get_key(username)) == 1
+
+
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     try:
         payload = jwt.decode(

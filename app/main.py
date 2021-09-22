@@ -13,7 +13,7 @@ from app.handlers import Handlers
 from app.models import Token, User
 from app.security import (ACCESS_TOKEN_EXPIRE_MINUTES, authenticate_user,
                           create_access_token, get_current_active_user,
-                          set_user)
+                          set_user, user_exists)
 
 app = FastAPI(title=__service__, root_path=__root__, version=__version__)
 
@@ -71,6 +71,12 @@ async def login_for_access_token(
 
 @app.post("/register", response_model=User)
 async def register_new_user(form_data: OAuth2PasswordRequestForm = Depends()):
+    if user_exists(form_data.username):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"USer already exists",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     user = await set_user(form_data.username, form_data.password)
     return user
 
