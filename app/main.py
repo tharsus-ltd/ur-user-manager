@@ -32,6 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.on_event("startup")
 async def startup():
     # Wait for RabbitMQ and Redis
@@ -74,7 +75,7 @@ async def register_new_user(form_data: OAuth2PasswordRequestForm = Depends()):
     if user_exists(form_data.username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"USer already exists",
+            detail="User already exists",
             headers={"WWW-Authenticate": "Bearer"},
         )
     user = await set_user(form_data.username, form_data.password)
