@@ -2,10 +2,8 @@ import pytest
 
 from datetime import timedelta
 
-from app import __secret_key__
 from app.models import User
 from app.security import create_access_token, get_current_user, set_user, user_exists
-
 
 
 @pytest.fixture

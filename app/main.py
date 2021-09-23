@@ -1,6 +1,8 @@
 import asyncio
+import json
 
 from datetime import timedelta
+from typing import List
 
 from fastapi import FastAPI, status
 from fastapi.exceptions import HTTPException
@@ -8,7 +10,7 @@ from fastapi.param_functions import Depends
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import __root__, __service__, __version__
+from app import __root__, __service__, __version__, __startup_time__
 from app.handlers import Handlers
 from app.models import Token, User
 from app.security import (ACCESS_TOKEN_EXPIRE_MINUTES, authenticate_user,
@@ -17,16 +19,9 @@ from app.security import (ACCESS_TOKEN_EXPIRE_MINUTES, authenticate_user,
 
 app = FastAPI(title=__service__, root_path=__root__, version=__version__)
 
-origins = [
-    "http://localhost",
-    "http://localhost:8001",
-    "http://localhost:8002",
-    "http://localhost:5000"
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,7 +31,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     # Wait for RabbitMQ and Redis
-    await asyncio.sleep(20)
+    await asyncio.sleep(__startup_time__)
     await Handlers().init()
 
 
@@ -72,14 +67,22 @@ async def login_for_access_token(
 
 @app.post("/register", response_model=User)
 async def register_new_user(form_data: OAuth2PasswordRequestForm = Depends()):
-    if user_exists(form_data.username):
+    if await user_exists(form_data.username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User already exists",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail=f"User: {form_data.username} already exists",
         )
     user = await set_user(form_data.username, form_data.password)
     return user
+
+
+@app.get("/users", response_model=List[User])
+async def get_all_users():
+    users = []
+    async for key in Handlers().redis.scan_iter("user:*"):
+        raw = await Handlers().redis.get(key)
+        users.append(User(**json.loads(raw)))
+    return users
 
 
 @app.get("/users/me", response_model=User)
