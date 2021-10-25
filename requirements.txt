@@ -1,4 +1,5 @@
 fastapi[All]
+jaeger-client
 pytest
 hypothesis
 pytest-asyncio
