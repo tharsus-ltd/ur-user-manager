@@ -4,18 +4,23 @@ import json
 from datetime import timedelta
 from typing import List
 
+from jaeger_client import Config
+from opentracing.scope_managers.contextvars import ContextVarsScopeManager
+
 from fastapi import FastAPI, status
 from fastapi.exceptions import HTTPException
 from fastapi.param_functions import Depends
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import __root__, __service__, __version__, __startup_time__
+from app import JAEGER_HOST, JAEGER_PORT, __root__, __service__, __version__, __startup_time__
 from app.handlers import Handlers
 from app.models import Token, User
 from app.security import (ACCESS_TOKEN_EXPIRE_MINUTES, authenticate_user,
                           create_access_token, get_current_active_user,
                           set_user, user_exists)
+from app.tracing import TracingMiddleWare
+
 
 app = FastAPI(title=__service__, root_path=__root__, version=__version__)
 
@@ -26,6 +31,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+config = Config(
+    config={
+        'sampler': {
+            'type': 'const',
+            'param': 1,
+        },
+        'local_agent': {
+            'reporting_host': JAEGER_HOST,
+            'reporting_port': JAEGER_PORT,
+        },
+        'logging': True,
+    },
+    scope_manager=ContextVarsScopeManager(),
+    service_name=__service__,
+    validate=True,
+)
+
+jaeger_tracer = config.initialize_tracer()
+app.add_middleware(TracingMiddleWare, tracer=jaeger_tracer)
 
 
 @app.on_event("startup")
