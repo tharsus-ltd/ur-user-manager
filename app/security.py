@@ -6,6 +6,7 @@ from datetime import timedelta, datetime
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+import opentracing
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 
@@ -33,29 +34,41 @@ def get_key(username: Optional[str]) -> str:
 
 
 async def set_user(username: str, password: str) -> User:
-    new_user = UserInDB(
-        username=username,
-        hashed_password=get_password_hash(password)
-    )
-    await Handlers().redis.set(get_key(username), new_user.json())
-    return new_user
+    with opentracing.tracer.start_active_span("set-user") as scope:
+        new_user = UserInDB(
+            username=username,
+            hashed_password=get_password_hash(password)
+        )
+        scope.span.log_kv(new_user.dict())
+        await Handlers().redis.set(get_key(username), new_user.json())
+        return new_user
 
 
 async def get_user(username: Optional[str]) -> UserInDB:
-    if await Handlers().redis.exists(get_key(username)):
-        raw = await Handlers().redis.get(get_key(username))
-        user_dict = json.loads(raw)
-        return UserInDB(**user_dict)
-    raise ValueError(f"Username: {username} not found")
+    with opentracing.tracer.start_active_span("get-user") as scope:
+        if await Handlers().redis.exists(get_key(username)):
+            raw = await Handlers().redis.get(get_key(username))
+            user_dict = json.loads(raw)
+            scope.span.log_kv(user_dict)
+            return UserInDB(**user_dict)
+
+        err = f"Username: {username} not found"
+        scope.span.log_kv({"error": err})
+        raise ValueError(err)
 
 
 async def authenticate_user(username: str, password: str) -> UserInDB:
-    user = await get_user(username)
-    if not user:
-        raise ValueError(f"Error getting user: {username}")
-    if not verify_password(password, user.hashed_password):
-        raise ValueError(f"Error verifying password for username: {username}")
-    return user
+    with opentracing.tracer.start_active_span("authenticate-user") as scope:
+        user = await get_user(username)
+        if not user:
+            err = f"Error getting user: {username}"
+            scope.span.log_kv({"error": err})
+            raise ValueError(err)
+        if not verify_password(password, user.hashed_password):
+            err = f"Error verifying password for username: {username}"
+            scope.span.log_kv({"error": err})
+            raise ValueError(err)
+        return user
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -80,7 +93,10 @@ def get_jwt_issuer() -> str:
 
 
 async def user_exists(username: str) -> bool:
-    return (await Handlers().redis.exists(get_key(username))) >= 1
+    with opentracing.tracer.start_active_span("authenticate-user") as scope:
+        res = (await Handlers().redis.exists(get_key(username))) >= 1
+        scope.span.log_kv({"result": res})
+        return res
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
